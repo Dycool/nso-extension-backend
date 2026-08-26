@@ -34,11 +34,11 @@ jobs:
       - name: TypeScript Typecheck
         run: npm run typecheck
 
-      - name: Run Test Suite
-        run: npm test
-
       - name: Build Extension Bundle
         run: npm run build
+
+      - name: Run Test Suite
+        run: npm test
 
       - name: Create ZIP Package
         run: |
