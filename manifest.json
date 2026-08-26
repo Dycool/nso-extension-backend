@@ -44,5 +44,6 @@
       "http://localhost:*/*",
       "http://127.0.0.1:*/*"
     ]
-  }
+  },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsEwno0SZSoIsejuTw2yDIOy9fmIZsvev+yqOCtdxhTY0oSHbeTbeZHcXsCUM3iUiEY8k/fd1ZgK9bWUUp2+3y3V6OY92B7oF3gw4DvpHOTiIiOsKq/RfZRNLS/Zu65rU15Ng4RsnfwetOZuFl1JacaOvqsQiDyEIT/AaNDUEB+ztBC43HOs2cJF6CSxy3PtfR0zUZh63AbcVPo1yCo8kO4J6McCHh+bqmIoMeSAoc/FwXJoVgPywXqOTq9tHje5po7ZjdCsMBgRomqFEg08qYVCpzgKLtUs5lsg6JzYJHqX5yanZfLMp1fex6ZK0hFlCbZ1HNrwmX/rVhOzdHOb+GwIDAQAB"
 }
