@@ -3,6 +3,20 @@
  * Runs at document_start in world: 'MAIN'.
  */
 
+declare global {
+    interface Window {
+        __NSO_ZNCA_BRIDGE_INSTALLED__?: boolean;
+        webkit?: {
+            messageHandlers?: {
+                invokeMethod?: {
+                    postMessage: (msg: any) => void;
+                };
+            };
+        };
+        invokeMethod?: (action: string, data: any) => void;
+    }
+}
+
 (function installZncaNativeBridge() {
     if (window.__NSO_ZNCA_BRIDGE_INSTALLED__) return;
     window.__NSO_ZNCA_BRIDGE_INSTALLED__ = true;
@@ -10,14 +24,14 @@
     // --- Zelda Notes Canvas Optimization ---
     try {
         const nativeCanvasGetContext = HTMLCanvasElement.prototype.getContext;
-        HTMLCanvasElement.prototype.getContext = function(type: any, options: any) {
+        HTMLCanvasElement.prototype.getContext = function(this: HTMLCanvasElement, type: any, options?: any): any {
             if (String(type || '').toLowerCase() === '2d') {
                 const nextOptions = options && typeof options === 'object'
                     ? Object.assign({}, options, { willReadFrequently: true })
                     : { willReadFrequently: true };
-                return nativeCanvasGetContext.call(this, type, nextOptions);
+                return (nativeCanvasGetContext as any).call(this, type, nextOptions);
             }
-            return nativeCanvasGetContext.call(this, type, options);
+            return (nativeCanvasGetContext as any).call(this, type, options);
         };
     } catch (_) {}
 
@@ -58,13 +72,15 @@
         }
     };
 
-    if (!window.webkit) (window as any).webkit = {};
-    if (!(window as any).webkit.messageHandlers) (window as any).webkit.messageHandlers = {};
-    (window as any).webkit.messageHandlers.invokeMethod = bridgeHandler;
-    (window as any).invokeMethod = function(action: string, data: any) {
+    if (!window.webkit) window.webkit = {};
+    if (!window.webkit.messageHandlers) window.webkit.messageHandlers = {};
+    window.webkit.messageHandlers.invokeMethod = bridgeHandler;
+    window.invokeMethod = function(action: string, data: any) {
         bridgeHandler.postMessage({ action, data });
     };
 
     // Notify ready
     sendBridgeEventToHost('bridgeReady', { url: location.href });
 })();
+
+export {};

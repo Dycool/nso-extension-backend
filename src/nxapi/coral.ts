@@ -175,7 +175,7 @@ export async function performCoralApiCallFast(body: {
         {
             method: 'POST',
             headers,
-            body: decodeBase64Bytes(encryptedJson.data)
+            body: decodeBase64Bytes(encryptedJson.data) as any
         },
         `Nintendo Coral ${body.path}`,
         body.signal
@@ -232,7 +232,7 @@ export async function acquireGameWebServiceTokenFast(body: {
                 'X-Platform': 'Android',
                 'User-Agent': `com.nintendo.znca/${body.zncaVersion}(Android/12)`
             },
-            body: encrypted.bytes
+            body: encrypted.bytes as any
         },
         'Nintendo GameWebServiceToken',
         body.signal
@@ -333,7 +333,7 @@ export async function acquireCoralSessionFast(body: {
                 'X-Platform': 'Android',
                 'User-Agent': `com.nintendo.znca/${body.zncaVersion}(Android/12)`
             },
-            body: decodeBase64Bytes(fJson.encrypted_token_request)
+            body: decodeBase64Bytes(fJson.encrypted_token_request) as any
         },
         'Nintendo Coral Account/Login',
         body.signal
