@@ -1,0 +1,48 @@
+{
+  "manifest_version": 3,
+  "name": "NSO WebApp Companion",
+  "version": "1.0.0",
+  "description": "Local zero-worker browser backend & CORS companion for Nintendo Switch Online WebApp.",
+  "permissions": [
+    "declarativeNetRequest",
+    "declarativeNetRequestWithHostAccess",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://accounts.nintendo.com/*",
+    "https://api.accounts.nintendo.com/*",
+    "https://*.nintendo.net/*",
+    "https://api-lp1.znc.srv.nintendo.net/*",
+    "https://api.lp1.av5ja.srv.nintendo.net/*",
+    "https://web.sd.lp1.acbaa.srv.nintendo.net/*",
+    "https://nxapi-znca-api.fancy.org.uk/*",
+    "https://nxapi-auth.fancy.org.uk/*",
+    "https://*.fancy.org.uk/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.nintendo.net/*",
+        "https://api.lp1.av5ja.srv.nintendo.net/*",
+        "https://web.sd.lp1.acbaa.srv.nintendo.net/*"
+      ],
+      "js": [
+        "bridge-content-script.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN",
+      "all_frames": true
+    }
+  ],
+  "externally_connectable": {
+    "matches": [
+      "https://dycool.github.io/*",
+      "http://localhost:*/*",
+      "http://127.0.0.1:*/*"
+    ]
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "name": "nso-extension-backend",
+  "version": "1.0.0",
+  "description": "Manifest V3 Browser Extension Backend for Nintendo Switch Online WebApp",
+  "scripts": {
+    "build": "node build.js",
+    "dev": "node build.js --watch",
+    "test": "node test-extension.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "nintendo",
+    "nso",
+    "coral",
+    "nxapi",
+    "browser-extension",
+    "manifest-v3"
+  ],
+  "author": "Dycool",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/chrome": "^0.0.270",
+    "esbuild": "^0.23.0",
+    "typescript": "^5.5.4"
+  }
+}
