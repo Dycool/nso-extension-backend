@@ -1,73 +1,87 @@
+<p align="center">
+  <img src="icons/icon128.png" alt="NSO Extension Backend icon" width="128" height="128">
+</p>
+
 # NSO Extension Backend
 
-Manifest V3 browser extension serving as a 100% local, direct connection backend for the **[Nintendo Switch Online WebApp](https://dycool.github.io/nso-webapp)**.
+**Local zero-worker companion and direct connection engine for the [Nintendo Switch Online WebApp](https://dycool.github.io/nso-webapp).**
+
+⚡ **Zero-server backend** — Connects directly from the browser background service worker to Nintendo APIs and nxapi with no remote proxy relay.
+
+🛡️ **DeclarativeNetRequest header injection** — Dynamically strips `X-Frame-Options` and `Content-Security-Policy` from Nintendo domains and injects `X-GameWebToken` headers into Game Web Service iframe requests (NookLink, SplatNet 3, Smash World, etc.).
+
+🌉 **Native znca mobile bridge** — Injects the Nintendo Switch App JavaScript bridge (`window.webkit.messageHandlers.invokeMethod`) in `world: "MAIN"` at `document_start` so Game Web Services function seamlessly.
+
+🔍 **Automatic WebApp detection** — The WebApp (`https://dycool.github.io/nso-webapp` or `localhost`) automatically detects the extension on startup via `externally_connectable` with a deterministic Extension ID (`bjcigdmffhlolfpaocccgclocgdnenfc`).
+
+🚀 **Cross-browser support** — Manifest V3 extension compatible with Google Chrome, Microsoft Edge, Brave, and other Chromium-based browsers.
+
+> **Pre-packaged Extension Available!**
+> Download `nso-extension-backend.zip` from the **[Releases](https://github.com/Dycool/nso-extension-backend/releases)** page.
 
 ---
 
-## Overview
+## 🚀 Quick Start
 
-The extension enables the WebApp to run all Nintendo Switch Online web traffic directly from your PC to Nintendo servers without requiring an external proxy server.
-
-### Key Features
-* **Direct Local Connection**: Network requests and authentication are handled entirely within the browser's background service worker directly to Nintendo APIs (`api-lp1.znc.srv.nintendo.net`, `accounts.nintendo.com`) and nxapi (`fancy.org.uk`).
-* **DeclarativeNetRequest Header Injection**: Dynamically strips `X-Frame-Options` & `Content-Security-Policy` from Nintendo domains and injects `X-GameWebToken` headers into Game Web Service iframe requests (NookLink, SplatNet 3, Smash World, etc.).
-* **Native znca Mobile Bridge (`world: "MAIN"`)**: Injects the Nintendo Switch App JavaScript bridge (`window.webkit.messageHandlers.invokeMethod`) at `document_start` so Game Web Services work seamlessly in standard browser environments.
-* **Automatic WebApp Detection**: The WebApp (`https://dycool.github.io` or `localhost`) detects the extension automatically on load via `externally_connectable` with a deterministic Extension ID (`bjcigdmffhlolfpaocccgclocgdnenfc`).
-
----
-
-## Installation
-
-### Method 1: Drag & Drop (.zip Release)
-1. Download the latest `nso-extension-backend.zip` from the **[Releases](https://github.com/Dycool/nso-extension-backend/releases)** page.
-2. Open Chrome, Edge, or Brave and navigate to:
-   * `chrome://extensions` (Chrome/Brave) or `edge://extensions` (Edge)
+### Drag & Drop Installation (.zip Release)
+1. Download `nso-extension-backend.zip` from the **[Releases](https://github.com/Dycool/nso-extension-backend/releases)** page.
+2. Open your browser and navigate to:
+   * **Chrome / Brave**: `chrome://extensions`
+   * **Edge**: `edge://extensions`
 3. Toggle **Developer mode** in the top-right corner to **ON**.
 4. Drag and drop `nso-extension-backend.zip` directly onto the extensions page.
-5. Refresh the [NSO WebApp](https://dycool.github.io/nso-webapp) (or `http://localhost:8080`).
-
-### Method 2: Build & Load Unpacked
-1. Clone the repository and install dependencies:
-   ```bash
-   git clone https://github.com/Dycool/nso-extension-backend.git
-   cd nso-extension-backend
-   npm install
-   npm run build
-   ```
-2. Open `chrome://extensions` or `edge://extensions` and enable **Developer mode**.
-3. Click **Load unpacked** and select the `dist/` folder.
-4. Refresh the [NSO WebApp](https://dycool.github.io/nso-webapp).
+5. Open or refresh the **[NSO WebApp](https://dycool.github.io/nso-webapp)** (or `http://localhost:8080`).
 
 ---
 
-## Verification
+## 🔨 Building from Source
 
-Once installed, check the browser console in the WebApp:
-```text
-[backend:extension] Connected to browser extension backend (v1.0.0)
-```
-*(Or in your selected language, e.g. `[backend:extension] Ligado ao backend da extensão do navegador (v1.0.0)`)*
+Requires **Node.js 20+** and **npm**.
 
-Under **Settings ➔ Other ➔ Proxy Settings**, the status will display:
-```text
-🟢 NSO Extension
-All network traffic and authentication are handled entirely locally on your PC directly to Nintendo.
+```bash
+# Clone the repository
+git clone https://github.com/Dycool/nso-extension-backend.git
+cd nso-extension-backend
+
+# Install dependencies
+npm install
+
+# Build the extension into dist/
+npm run build
+
+# Or build and create a release .zip package
+npm run package
 ```
+
+### Loading Unpacked in Browser
+1. In `chrome://extensions` or `edge://extensions`, enable **Developer mode**.
+2. Click **Load unpacked** and select the [`dist/`](dist) folder in this repository.
+3. Open the **[NSO WebApp](https://dycool.github.io/nso-webapp)**.
 
 ---
 
-## Development & Scripts
+## 📜 Development Scripts
 
 | Command | Description |
 | :--- | :--- |
-| `npm run build` | Compiles TypeScript and bundles with `esbuild` into `dist/`. |
-| `npm run package` | Builds the extension and packages `nso-extension-backend.zip` with POSIX forward-slash paths. |
+| `npm run build` | Compiles TypeScript and bundles scripts with `esbuild` into `dist/`. |
+| `npm run package` | Builds the extension and packages `nso-extension-backend.zip` with POSIX-compliant paths. |
 | `npm run dev` | Starts `esbuild` watch mode for live extension development. |
-| `npm test` | Builds the bundle and executes the automated test suite. |
+| `npm test` | Runs the automated test suite verifying manifest, rules, and background handlers. |
 | `npm run typecheck` | Validates TypeScript types (`tsc --noEmit`). |
 
 ---
 
-## License
+## 🔐 Privacy & Security
 
-MIT License.
+* **Local Request Handling**: Authentication tokens and Nintendo Coral network traffic never leave your computer to third-party proxy servers.
+* **Ephemeral Memory**: The extension does not store passwords or OAuth refresh secrets to disk. Short-lived session credentials are held in memory and cleared on sign-out.
+* **Granular Host Permissions**: Network access is scoped strictly to official Nintendo endpoints (`*.nintendo.net`, `*.nintendo.com`, `accounts.nintendo.com`) and the public nxapi attestation API (`*.fancy.org.uk`).
+
+---
+
+## 📄 License & Nintendo Notice
+
+The project's original source code is available under the [MIT License](LICENSE).
+
+This is an unofficial interoperability project and is not affiliated with, endorsed by, sponsored by, or approved by Nintendo. Nintendo, Nintendo Switch, Nintendo Switch Online, and related names, logos, game-service content, and APIs remain the property of their respective owners.
