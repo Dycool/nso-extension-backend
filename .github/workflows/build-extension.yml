@@ -49,12 +49,12 @@ jobs:
 
       - name: Package & Release on GitHub Tag
         if: startsWith(github.ref, 'refs/tags/v')
-        run: |
-          cd dist && zip -r ../nso-extension.zip ./* && cd ..
+        run: node build.js --zip
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: nso-extension.zip
+          files: nso-extension-backend.zip
+          draft: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

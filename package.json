@@ -4,8 +4,9 @@
   "description": "Manifest V3 Browser Extension Backend for Nintendo Switch Online WebApp",
   "scripts": {
     "build": "node build.js",
+    "package": "node build.js --zip",
     "dev": "node build.js --watch",
-    "test": "node build.js && node test-extension.js",
+    "test": "node build.js --zip && node test-extension.js",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [
