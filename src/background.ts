@@ -56,18 +56,34 @@ function setupCookieAutoFixListener() {
     });
 }
 
+async function initializeAllTabStates(): Promise<void> {
+    if (typeof chrome === 'undefined' || !chrome.tabs || !chrome.action) return;
+    try {
+        await chrome.action.disable();
+        const tabs = await chrome.tabs.query({});
+        for (const tab of tabs) {
+            if (typeof tab.id === 'number') {
+                await updateTabActionState(tab.id, tab.url);
+            }
+        }
+    } catch (_) {}
+}
+
 // Initialize DeclarativeNetRequest rules on startup and installation
 chrome.runtime.onInstalled.addListener(() => {
     setupDefaultDnrRules();
     setupCookieAutoFixListener();
+    initializeAllTabStates();
 });
 
 chrome.runtime.onStartup.addListener(() => {
     setupDefaultDnrRules();
     setupCookieAutoFixListener();
+    initializeAllTabStates();
 });
 
 setupCookieAutoFixListener();
+initializeAllTabStates();
 
 /**
  * Central Message Dispatcher for external WebApp (dycool.github.io / localhost)
@@ -138,6 +154,48 @@ async function dispatchMessage(msg: any): Promise<{ status: number; data: any; t
                 data: { error: 'unknown_message_type', type }
             };
     }
+}
+
+function isWebappUrl(url?: string): boolean {
+    if (!url) return false;
+    try {
+        const parsed = new URL(url);
+        if (parsed.hostname === 'dycool.github.io' && parsed.pathname.startsWith('/nso-webapp')) return true;
+        if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') return true;
+    } catch (_) {}
+    return false;
+}
+
+async function updateTabActionState(tabId: number, url?: string): Promise<void> {
+    if (typeof chrome === 'undefined' || !chrome.action) return;
+    try {
+        if (isWebappUrl(url)) {
+            await chrome.action.enable(tabId);
+            await chrome.action.setBadgeText({ tabId, text: 'ON' });
+            await chrome.action.setBadgeBackgroundColor({ tabId, color: '#e60012' });
+            await chrome.action.setTitle({ tabId, title: 'Nintendo Switch Online WebApp (Active)' });
+        } else {
+            await chrome.action.disable(tabId);
+            await chrome.action.setBadgeText({ tabId, text: '' });
+            await chrome.action.setTitle({ tabId, title: 'Nintendo Switch Online WebApp (Inactive - Open WebApp to activate)' });
+        }
+    } catch (_) {}
+}
+
+// Track tab updates and activation to manage extension active state per-tab
+if (typeof chrome !== 'undefined' && chrome.tabs) {
+    chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+        if (changeInfo.url || changeInfo.status === 'complete') {
+            updateTabActionState(tabId, tab.url || changeInfo.url);
+        }
+    });
+
+    chrome.tabs.onActivated.addListener(async (activeInfo) => {
+        try {
+            const tab = await chrome.tabs.get(activeInfo.tabId);
+            updateTabActionState(activeInfo.tabId, tab?.url);
+        } catch (_) {}
+    });
 }
 
 /**
