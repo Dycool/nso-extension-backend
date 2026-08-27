@@ -29,8 +29,8 @@ export async function setupDefaultDnrRules(): Promise<void> {
                 { header: 'content-security-policy-report-only', operation: chrome.declarativeNetRequest.HeaderOperation.REMOVE },
                 { header: 'cross-origin-embedder-policy', operation: chrome.declarativeNetRequest.HeaderOperation.REMOVE },
                 { header: 'cross-origin-opener-policy', operation: chrome.declarativeNetRequest.HeaderOperation.REMOVE },
-                { header: 'cross-origin-resource-policy', operation: chrome.declarativeNetRequest.HeaderOperation.REMOVE },
-                { header: 'set-cookie', operation: chrome.declarativeNetRequest.HeaderOperation.REMOVE }
+                { header: 'cross-origin-resource-policy', operation: chrome.declarativeNetRequest.HeaderOperation.REMOVE }
+
             ]
         },
         condition: {

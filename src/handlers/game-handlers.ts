@@ -5,6 +5,104 @@ import { resolveAllowedOrigins, isNookLinkService, isZeldaNotesService } from '.
 import { updateGameSessionDnrRules, clearGameSessionDnrRules } from '../dnr/dnr-manager';
 import { CookieJar } from '../proxy/cookie-jar';
 
+const ZELDA_DOMAIN = 'api.lp1.87abc152.srv.nintendo.net';
+const ZELDA_DOT_DOMAIN = '.api.lp1.87abc152.srv.nintendo.net';
+
+/**
+ * Generates a random browser-fingerprint-like alphanumeric string.
+ */
+function generateBrowserFingerprint(): string {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    const arr = new Uint8Array(19);
+    crypto.getRandomValues(arr);
+    for (let i = 0; i < arr.length; i++) {
+        result += chars[arr[i] % chars.length];
+    }
+    return result;
+}
+
+/**
+ * Injects Zelda Notes auth cookies directly into the browser's cookie store
+ * via chrome.cookies.set(). This eliminates the need for proxy-based cookie
+ * management — the browser sends the cookies natively on every request to
+ * Nintendo's Zelda Notes domain.
+ */
+async function injectZeldaCookies(
+    jar: CookieJar,
+    targetUrl: URL,
+    language: string,
+    country: string
+): Promise<void> {
+    if (typeof chrome === 'undefined' || !chrome.cookies) return;
+
+    const twoYearsFromNow = Math.floor(Date.now() / 1000) + 2 * 365 * 24 * 60 * 60;
+    const baseUrl = `https://${ZELDA_DOMAIN}/`;
+
+    // Helper to set a single cookie with correct cross-site attributes
+    async function setCookie(
+        name: string,
+        value: string,
+        domain: string,
+        httpOnly: boolean = false,
+        expirationDate?: number
+    ): Promise<void> {
+        try {
+            await chrome.cookies.set({
+                url: baseUrl,
+                name,
+                value,
+                domain,
+                path: '/',
+                secure: true,
+                sameSite: 'no_restriction',
+                httpOnly,
+                expirationDate: expirationDate || twoYearsFromNow
+            });
+        } catch (_) {}
+    }
+
+    // 1. Inject all cookies captured from the Nintendo bootstrap response
+    //    (a5_token, AWSALBTG, AWSALBTGCORS, etc.)
+    const bootstrapCookies = jar.getCookies();
+    for (const cookie of bootstrapCookies) {
+        const domain = cookie.hostOnly ? ZELDA_DOMAIN : ZELDA_DOT_DOMAIN;
+        const expiry = cookie.expires
+            ? Math.floor(cookie.expires / 1000)
+            : twoYearsFromNow;
+        await setCookie(cookie.name, cookie.value, domain, cookie.httpOnly, expiry);
+
+        // Some cookies need to exist on both the bare and dot-prefixed domain
+        // to match the proven working cookie set
+        if (cookie.name === 'a5_token' || cookie.name === 'na_country' || cookie.name === 'lang') {
+            const altDomain = domain === ZELDA_DOMAIN ? ZELDA_DOT_DOMAIN : ZELDA_DOMAIN;
+            await setCookie(cookie.name, cookie.value, altDomain, cookie.httpOnly, expiry);
+        }
+    }
+
+    // 2. Inject supplemental cookies that tell Zelda Notes it's running in
+    //    the mobile app context (prevents PC-app redirect)
+    const supplementalCookies: Array<{ name: string; value: string; domain: string; httpOnly: boolean }> = [
+        { name: 'appplatform', value: 'android', domain: ZELDA_DOMAIN, httpOnly: true },
+        { name: 'na_country', value: country, domain: ZELDA_DOMAIN, httpOnly: true },
+        { name: 'na_country', value: country, domain: ZELDA_DOT_DOMAIN, httpOnly: true },
+        { name: 'lang', value: language, domain: ZELDA_DOMAIN, httpOnly: true },
+        { name: 'lang', value: language, domain: ZELDA_DOT_DOMAIN, httpOnly: true },
+        { name: 'browser_fingerprint', value: generateBrowserFingerprint(), domain: ZELDA_DOMAIN, httpOnly: false }
+    ];
+
+    // Only inject supplemental cookies that weren't already set by the bootstrap
+    const existingNames = new Set(bootstrapCookies.map(c => c.name));
+    for (const sc of supplementalCookies) {
+        // For dual-domain cookies (na_country, lang), always inject the dot-domain variant
+        // even if the bare-domain one was already set by bootstrap
+        const isAltDomain = sc.domain === ZELDA_DOT_DOMAIN;
+        if (!existingNames.has(sc.name) || isAltDomain) {
+            await setCookie(sc.name, sc.value, sc.domain, sc.httpOnly);
+        }
+    }
+}
+
 export async function handleGameSessionCreate(body: {
     serviceId?: string | number;
     serviceUri?: string;
@@ -42,7 +140,6 @@ export async function handleGameSessionCreate(body: {
     if (!targetUrl.searchParams.has('na_lang')) targetUrl.searchParams.set('na_lang', language);
 
     const isZelda = isZeldaNotesService(serviceId, body.serviceUri);
-    let cookieString: string | undefined = undefined;
     let webviewUrl = targetUrl.toString();
 
     if (isZelda) {
@@ -66,18 +163,16 @@ export async function handleGameSessionCreate(body: {
             if (prewarmRes.url) {
                 jar.setCookiesFromResponse(prewarmRes.headers, new URL(prewarmRes.url));
             }
-            const generated = jar.getCookieHeader(targetUrl);
-            if (generated) cookieString = generated;
         } catch (_) {}
+
+        // Inject cookies directly into the browser's cookie store — no proxy needed
+        await injectZeldaCookies(jar, targetUrl, language, country);
 
         // Launch directly into /title-select on Nintendo's origin
         const titleSelectUrl = new URL('/title-select', targetUrl.origin);
         titleSelectUrl.search = targetUrl.search;
         webviewUrl = titleSelectUrl.toString();
     }
-
-    // Register active DeclarativeNetRequest rules with token and prewarmed cookies
-    await updateGameSessionDnrRules(serviceId, body.serviceUri, body.token, language, country, cookieString);
 
     return {
         status: 200,
