@@ -30,7 +30,7 @@ export async function setupDefaultDnrRules(): Promise<void> {
             ]
         },
         condition: {
-            urlFilter: '||nintendo.net/',
+            requestDomains: ['nintendo.net', 'nintendo.com'],
             resourceTypes: [
                 chrome.declarativeNetRequest.ResourceType.MAIN_FRAME,
                 chrome.declarativeNetRequest.ResourceType.SUB_FRAME,
@@ -89,7 +89,7 @@ export async function updateGameSessionDnrRules(
             requestHeaders
         },
         condition: {
-            urlFilter: '||nintendo.net/',
+            requestDomains: ['nintendo.net', 'nintendo.com'],
             resourceTypes: [
                 chrome.declarativeNetRequest.ResourceType.SUB_FRAME,
                 chrome.declarativeNetRequest.ResourceType.XMLHTTPREQUEST,

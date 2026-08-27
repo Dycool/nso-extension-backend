@@ -12,9 +12,8 @@
     "https://accounts.nintendo.com/*",
     "https://api.accounts.nintendo.com/*",
     "https://*.nintendo.net/*",
-    "https://api-lp1.znc.srv.nintendo.net/*",
-    "https://api.lp1.av5ja.srv.nintendo.net/*",
-    "https://web.sd.lp1.acbaa.srv.nintendo.net/*",
+    "https://*.srv.nintendo.net/*",
+    "https://*.nintendo.com/*",
     "https://nxapi-znca-api.fancy.org.uk/*",
     "https://nxapi-auth.fancy.org.uk/*",
     "https://*.fancy.org.uk/*"
@@ -27,8 +26,8 @@
     {
       "matches": [
         "https://*.nintendo.net/*",
-        "https://api.lp1.av5ja.srv.nintendo.net/*",
-        "https://web.sd.lp1.acbaa.srv.nintendo.net/*"
+        "https://*.srv.nintendo.net/*",
+        "https://*.nintendo.com/*"
       ],
       "js": [
         "bridge-content-script.js"
