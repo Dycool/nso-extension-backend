@@ -56,34 +56,18 @@ function setupCookieAutoFixListener() {
     });
 }
 
-async function initializeAllTabStates(): Promise<void> {
-    if (typeof chrome === 'undefined' || !chrome.tabs || !chrome.action) return;
-    try {
-        await chrome.action.disable();
-        const tabs = await chrome.tabs.query({});
-        for (const tab of tabs) {
-            if (typeof tab.id === 'number') {
-                await updateTabActionState(tab.id, tab.url);
-            }
-        }
-    } catch (_) {}
-}
-
 // Initialize DeclarativeNetRequest rules on startup and installation
 chrome.runtime.onInstalled.addListener(() => {
     setupDefaultDnrRules();
     setupCookieAutoFixListener();
-    initializeAllTabStates();
 });
 
 chrome.runtime.onStartup.addListener(() => {
     setupDefaultDnrRules();
     setupCookieAutoFixListener();
-    initializeAllTabStates();
 });
 
 setupCookieAutoFixListener();
-initializeAllTabStates();
 
 /**
  * Central Message Dispatcher for external WebApp (dycool.github.io / localhost)
@@ -166,38 +150,6 @@ function isWebappUrl(url?: string): boolean {
     return false;
 }
 
-async function updateTabActionState(tabId: number, url?: string): Promise<void> {
-    if (typeof chrome === 'undefined' || !chrome.action) return;
-    try {
-        if (isWebappUrl(url)) {
-            await chrome.action.enable(tabId);
-            await chrome.action.setBadgeText({ tabId, text: 'ON' });
-            await chrome.action.setBadgeBackgroundColor({ tabId, color: '#e60012' });
-            await chrome.action.setTitle({ tabId, title: 'Nintendo Switch Online WebApp (Active)' });
-        } else {
-            await chrome.action.disable(tabId);
-            await chrome.action.setBadgeText({ tabId, text: '' });
-            await chrome.action.setTitle({ tabId, title: 'Nintendo Switch Online WebApp (Inactive - Open WebApp to activate)' });
-        }
-    } catch (_) {}
-}
-
-// Track tab updates and activation to manage extension active state per-tab
-if (typeof chrome !== 'undefined' && chrome.tabs) {
-    chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-        if (changeInfo.url || changeInfo.status === 'complete') {
-            updateTabActionState(tabId, tab.url || changeInfo.url);
-        }
-    });
-
-    chrome.tabs.onActivated.addListener(async (activeInfo) => {
-        try {
-            const tab = await chrome.tabs.get(activeInfo.tabId);
-            updateTabActionState(activeInfo.tabId, tab?.url);
-        } catch (_) {}
-    });
-}
-
 /**
  * Click handler for extension toolbar action icon.
  * Focuses existing WebApp tab or opens a new tab.
@@ -205,19 +157,13 @@ if (typeof chrome !== 'undefined' && chrome.tabs) {
 if (typeof chrome !== 'undefined' && chrome.action?.onClicked) {
     chrome.action.onClicked.addListener(async () => {
         try {
-            const tabs = await chrome.tabs.query({
-                url: [
-                    'https://dycool.github.io/nso-webapp*',
-                    'http://localhost:*/*',
-                    'http://127.0.0.1:*/*'
-                ]
-            });
+            const allTabs = await chrome.tabs.query({});
+            const matchingTab = allTabs.find(t => isWebappUrl(t.url));
 
-            if (tabs && tabs.length > 0 && typeof tabs[0].id === 'number') {
-                const targetId: number = tabs[0].id;
-                await chrome.tabs.update(targetId, { active: true });
-                if (typeof tabs[0].windowId === 'number') {
-                    await chrome.windows.update(tabs[0].windowId, { focused: true });
+            if (matchingTab && typeof matchingTab.id === 'number') {
+                await chrome.tabs.update(matchingTab.id, { active: true });
+                if (typeof matchingTab.windowId === 'number') {
+                    await chrome.windows.update(matchingTab.windowId, { focused: true });
                 }
             } else {
                 await chrome.tabs.create({ url: 'https://dycool.github.io/nso-webapp/' });

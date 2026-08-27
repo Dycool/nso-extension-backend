@@ -30,11 +30,7 @@ export async function setupDefaultDnrRules(): Promise<void> {
                 { header: 'cross-origin-embedder-policy', operation: chrome.declarativeNetRequest.HeaderOperation.REMOVE },
                 { header: 'cross-origin-opener-policy', operation: chrome.declarativeNetRequest.HeaderOperation.REMOVE },
                 { header: 'cross-origin-resource-policy', operation: chrome.declarativeNetRequest.HeaderOperation.REMOVE },
-                { header: 'set-cookie', operation: chrome.declarativeNetRequest.HeaderOperation.REMOVE },
-                { header: 'access-control-allow-origin', operation: chrome.declarativeNetRequest.HeaderOperation.SET, value: 'https://dycool.github.io' },
-                { header: 'access-control-allow-credentials', operation: chrome.declarativeNetRequest.HeaderOperation.SET, value: 'true' },
-                { header: 'access-control-allow-headers', operation: chrome.declarativeNetRequest.HeaderOperation.SET, value: '*' },
-                { header: 'access-control-allow-methods', operation: chrome.declarativeNetRequest.HeaderOperation.SET, value: 'GET, POST, OPTIONS, PUT, DELETE, HEAD' }
+                { header: 'set-cookie', operation: chrome.declarativeNetRequest.HeaderOperation.REMOVE }
             ]
         },
         condition: {
