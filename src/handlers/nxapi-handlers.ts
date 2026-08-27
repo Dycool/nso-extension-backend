@@ -8,6 +8,7 @@ import {
 } from '../nxapi/coral';
 import { generateSharedMethod2Attestation } from '../nxapi/shared-f2';
 import { GameWebServiceTokenPipelineError } from '../nxapi/client';
+import { isStrictNintendoOrigin } from '../services/service-policy';
 
 export async function handleCoralSession(body: {
     clientId?: string;
@@ -256,3 +257,84 @@ export async function handleCoralBatch(body: {
         data: { results }
     };
 }
+
+export async function handleProxy(body: {
+    targetUrl?: string;
+    method?: string;
+    headers?: Record<string, string>;
+    data?: any;
+    dataBase64?: string;
+}): Promise<{ status: number; data: any; text?: string }> {
+    if (!body.targetUrl || typeof body.targetUrl !== 'string') {
+        return { status: 400, data: { error: 'Missing targetUrl parameter' } };
+    }
+
+    let targetUrl: URL;
+    try {
+        targetUrl = new URL(body.targetUrl);
+    } catch {
+        return { status: 400, data: { error: 'Invalid targetUrl format' } };
+    }
+
+    const targetHost = targetUrl.hostname.toLowerCase();
+    const allowedNxapiHosts = new Set([
+        'nxapi-znca-api.fancy.org.uk',
+        'nxapi-auth.fancy.org.uk',
+        'fancy.org.uk'
+    ]);
+
+    const isAllowed = isStrictNintendoOrigin(body.targetUrl) || allowedNxapiHosts.has(targetHost);
+    if (!isAllowed) {
+        return { status: 403, data: { error: 'Proxy request disallowed for this domain' } };
+    }
+
+    const defaultUserAgent = allowedNxapiHosts.has(targetHost)
+        ? 'nso-webapp/1.0 (+https://github.com/dycool/nso-webapp)'
+        : 'com.nintendo.znca/3.4.1 (Android/10)';
+
+    const fetchHeaders = new Headers();
+    if (body.headers && typeof body.headers === 'object') {
+        for (const [k, v] of Object.entries(body.headers)) {
+            if (v && typeof v === 'string') fetchHeaders.set(k, v);
+        }
+    }
+    if (!fetchHeaders.has('User-Agent')) fetchHeaders.set('User-Agent', defaultUserAgent);
+
+    let fetchBody: any = undefined;
+    const method = String(body.method || 'GET').toUpperCase();
+    if (['POST', 'PUT', 'PATCH'].includes(method)) {
+        if (body.dataBase64) {
+            const binaryString = atob(body.dataBase64);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            fetchBody = bytes;
+        } else if (body.data !== undefined) {
+            fetchBody = typeof body.data === 'string' ? body.data : JSON.stringify(body.data);
+        }
+    }
+
+    const response = await fetch(body.targetUrl, {
+        method,
+        headers: fetchHeaders,
+        body: fetchBody
+    });
+
+    const responseContentType = response.headers.get('Content-Type') || '';
+    if (responseContentType.includes('application/json')) {
+        try {
+            const jsonData = await response.json();
+            return { status: response.status, data: jsonData };
+        } catch (_) {}
+    }
+
+    const textData = await response.text();
+    try {
+        const jsonData = JSON.parse(textData);
+        return { status: response.status, data: jsonData, text: textData };
+    } catch (_) {
+        return { status: response.status, data: { raw: textData }, text: textData };
+    }
+}
+

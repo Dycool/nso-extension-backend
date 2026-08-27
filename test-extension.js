@@ -41,9 +41,13 @@ assert(Array.isArray(manifest.content_scripts) && manifest.content_scripts.lengt
 assert(manifest.content_scripts[0].world === 'MAIN', 'Bridge content script runs in world: MAIN');
 assert(manifest.content_scripts[0].run_at === 'document_start', 'Bridge content script runs at document_start');
 
+assert(manifest.action !== undefined, 'Action toolbar button is declared');
+assert(manifest.icons?.['128'] !== undefined, 'Extension icons are declared');
+
 // 2. Dist Build Artifacts
 assert(fs.existsSync(path.join(__dirname, 'dist/background.js')), 'dist/background.js is built');
 assert(fs.existsSync(path.join(__dirname, 'dist/bridge-content-script.js')), 'dist/bridge-content-script.js is built');
+assert(fs.existsSync(path.join(__dirname, 'dist/icons/icon128.png')), 'dist/icons/icon128.png is copied');
 assert(fs.existsSync(path.join(__dirname, 'dist/manifest.json')), 'dist/manifest.json is copied');
 
 const bgDist = read('dist/background.js');
@@ -52,6 +56,9 @@ assert(bgDist.includes('NSO_RESUME_SESSION'), 'Background worker handles NSO_RES
 assert(bgDist.includes('NSO_CORAL_SESSION'), 'Background worker handles NSO_CORAL_SESSION');
 assert(bgDist.includes('NSO_GAME_TOKEN'), 'Background worker handles NSO_GAME_TOKEN');
 assert(bgDist.includes('NSO_CORAL_CALL'), 'Background worker handles NSO_CORAL_CALL');
+assert(bgDist.includes('NSO_PROXY'), 'Background worker handles NSO_PROXY message');
+assert(bgDist.includes('cookies.onChanged'), 'Cookie auto-fix listener is present in background worker');
+assert(bgDist.includes('onClicked'), 'Action click listener is present in background worker');
 assert(bgDist.includes('NSO_GAME_SESSION_CREATE'), 'Background worker handles NSO_GAME_SESSION_CREATE');
 
 const csDist = read('dist/bridge-content-script.js');

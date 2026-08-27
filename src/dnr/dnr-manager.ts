@@ -26,7 +26,15 @@ export async function setupDefaultDnrRules(): Promise<void> {
             responseHeaders: [
                 { header: 'x-frame-options', operation: chrome.declarativeNetRequest.HeaderOperation.REMOVE },
                 { header: 'content-security-policy', operation: chrome.declarativeNetRequest.HeaderOperation.REMOVE },
-                { header: 'content-security-policy-report-only', operation: chrome.declarativeNetRequest.HeaderOperation.REMOVE }
+                { header: 'content-security-policy-report-only', operation: chrome.declarativeNetRequest.HeaderOperation.REMOVE },
+                { header: 'cross-origin-embedder-policy', operation: chrome.declarativeNetRequest.HeaderOperation.REMOVE },
+                { header: 'cross-origin-opener-policy', operation: chrome.declarativeNetRequest.HeaderOperation.REMOVE },
+                { header: 'cross-origin-resource-policy', operation: chrome.declarativeNetRequest.HeaderOperation.REMOVE },
+                { header: 'set-cookie', operation: chrome.declarativeNetRequest.HeaderOperation.REMOVE },
+                { header: 'access-control-allow-origin', operation: chrome.declarativeNetRequest.HeaderOperation.SET, value: 'https://dycool.github.io' },
+                { header: 'access-control-allow-credentials', operation: chrome.declarativeNetRequest.HeaderOperation.SET, value: 'true' },
+                { header: 'access-control-allow-headers', operation: chrome.declarativeNetRequest.HeaderOperation.SET, value: '*' },
+                { header: 'access-control-allow-methods', operation: chrome.declarativeNetRequest.HeaderOperation.SET, value: 'GET, POST, OPTIONS, PUT, DELETE, HEAD' }
             ]
         },
         condition: {
@@ -38,6 +46,8 @@ export async function setupDefaultDnrRules(): Promise<void> {
                 chrome.declarativeNetRequest.ResourceType.SCRIPT,
                 chrome.declarativeNetRequest.ResourceType.STYLESHEET,
                 chrome.declarativeNetRequest.ResourceType.IMAGE,
+                chrome.declarativeNetRequest.ResourceType.FONT,
+                chrome.declarativeNetRequest.ResourceType.MEDIA,
                 chrome.declarativeNetRequest.ResourceType.OTHER
             ]
         }
@@ -62,6 +72,7 @@ export async function updateGameSessionDnrRules(
     token: string,
     language = 'en-US',
     country = 'US',
+    cookieHeader?: string,
     zncaVersion = '3.4.1'
 ): Promise<void> {
     if (typeof chrome === 'undefined' || !chrome.declarativeNetRequest) return;
@@ -81,20 +92,41 @@ export async function updateGameSessionDnrRules(
         { header: 'User-Agent', operation: chrome.declarativeNetRequest.HeaderOperation.SET, value: effectiveUa }
     ];
 
+    if (cookieHeader && typeof cookieHeader === 'string' && cookieHeader.trim().length > 0) {
+        requestHeaders.push({
+            header: 'Cookie',
+            operation: chrome.declarativeNetRequest.HeaderOperation.SET,
+            value: cookieHeader.trim()
+        });
+    }
+
+    const responseHeaders: chrome.declarativeNetRequest.ModifyHeaderInfo[] = [];
+    if (cookieHeader && typeof cookieHeader === 'string' && cookieHeader.trim().length > 0) {
+        responseHeaders.push({
+            header: 'set-cookie',
+            operation: chrome.declarativeNetRequest.HeaderOperation.REMOVE
+        });
+    }
+
     const sessionRule: chrome.declarativeNetRequest.Rule = {
         id: ACTIVE_GAME_SESSION_RULE_ID,
         priority: 2,
         action: {
             type: chrome.declarativeNetRequest.RuleActionType.MODIFY_HEADERS,
-            requestHeaders
+            requestHeaders,
+            ...(responseHeaders.length > 0 ? { responseHeaders } : {})
         },
         condition: {
             requestDomains: ['nintendo.net', 'nintendo.com'],
             resourceTypes: [
+                chrome.declarativeNetRequest.ResourceType.MAIN_FRAME,
                 chrome.declarativeNetRequest.ResourceType.SUB_FRAME,
                 chrome.declarativeNetRequest.ResourceType.XMLHTTPREQUEST,
                 chrome.declarativeNetRequest.ResourceType.SCRIPT,
+                chrome.declarativeNetRequest.ResourceType.STYLESHEET,
                 chrome.declarativeNetRequest.ResourceType.IMAGE,
+                chrome.declarativeNetRequest.ResourceType.FONT,
+                chrome.declarativeNetRequest.ResourceType.MEDIA,
                 chrome.declarativeNetRequest.ResourceType.OTHER
             ]
         }

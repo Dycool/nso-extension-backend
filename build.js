@@ -14,6 +14,16 @@ async function build() {
         path.resolve(dist, 'manifest.json')
     );
 
+    // Copy icons to dist/icons
+    const iconsSrc = path.resolve(__dirname, 'icons');
+    const iconsDist = path.resolve(dist, 'icons');
+    if (fs.existsSync(iconsSrc)) {
+        if (!fs.existsSync(iconsDist)) fs.mkdirSync(iconsDist, { recursive: true });
+        for (const file of fs.readdirSync(iconsSrc)) {
+            fs.copyFileSync(path.join(iconsSrc, file), path.join(iconsDist, file));
+        }
+    }
+
     const backgroundConfig = {
         entryPoints: [path.resolve(__dirname, 'src/background.ts')],
         bundle: true,

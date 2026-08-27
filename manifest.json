@@ -1,12 +1,14 @@
 {
   "manifest_version": 3,
-  "name": "NSO WebApp Companion",
+  "name": "Nintendo Switch Online WebApp",
   "version": "1.0.0",
-  "description": "Local zero-worker browser backend & CORS companion for Nintendo Switch Online WebApp.",
+  "description": "Local zero-worker companion & CORS engine for Nintendo Switch Online WebApp.",
   "permissions": [
     "declarativeNetRequest",
     "declarativeNetRequestWithHostAccess",
-    "storage"
+    "storage",
+    "cookies",
+    "tabs"
   ],
   "host_permissions": [
     "https://accounts.nintendo.com/*",
@@ -18,6 +20,21 @@
     "https://nxapi-auth.fancy.org.uk/*",
     "https://*.fancy.org.uk/*"
   ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_title": "Nintendo Switch Online WebApp",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
   "background": {
     "service_worker": "background.js",
     "type": "module"
@@ -44,5 +61,17 @@
       "http://127.0.0.1:*/*"
     ]
   },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "bridge-content-script.js"
+      ],
+      "matches": [
+        "https://dycool.github.io/*",
+        "http://localhost:*/*",
+        "http://127.0.0.1:*/*"
+      ]
+    }
+  ],
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsEwno0SZSoIsejuTw2yDIOy9fmIZsvev+yqOCtdxhTY0oSHbeTbeZHcXsCUM3iUiEY8k/fd1ZgK9bWUUp2+3y3V6OY92B7oF3gw4DvpHOTiIiOsKq/RfZRNLS/Zu65rU15Ng4RsnfwetOZuFl1JacaOvqsQiDyEIT/AaNDUEB+ztBC43HOs2cJF6CSxy3PtfR0zUZh63AbcVPo1yCo8kO4J6McCHh+bqmIoMeSAoc/FwXJoVgPywXqOTq9tHje5po7ZjdCsMBgRomqFEg08qYVCpzgKLtUs5lsg6JzYJHqX5yanZfLMp1fex6ZK0hFlCbZ1HNrwmX/rVhOzdHOb+GwIDAQAB"
 }
