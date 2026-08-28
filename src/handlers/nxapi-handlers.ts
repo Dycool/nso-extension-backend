@@ -12,6 +12,41 @@ import { isStrictNintendoOrigin } from '../services/service-policy';
 
 const WORKER_API_BASE = 'https://nso-worker-backend.diogoenes0.workers.dev';
 
+let cachedExtensionNxapiToken: { token: string; expiresAt: number } | null = null;
+
+export async function getOrFetchNxapiToken(providedToken?: string): Promise<string | null> {
+    if (providedToken) return providedToken;
+    if (cachedExtensionNxapiToken && cachedExtensionNxapiToken.expiresAt > Date.now() + 10_000) {
+        return cachedExtensionNxapiToken.token;
+    }
+    try {
+        const resp = await fetch('https://nxapi-auth.fancy.org.uk/oauth/token', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                Accept: 'application/json',
+                'User-Agent': 'nso-webapp/1.0 (+https://github.com/Dycool/nso-webapp)'
+            },
+            body: new URLSearchParams({
+                grant_type: 'client_credentials',
+                client_id: '019318b7-60f2-7e04-a634-118847842603',
+                scope: 'znca:api'
+            }).toString()
+        });
+        if (resp.ok) {
+            const data = await resp.json() as any;
+            if (data?.access_token) {
+                cachedExtensionNxapiToken = {
+                    token: data.access_token,
+                    expiresAt: Date.now() + Math.max(60, Number(data.expires_in || 3600)) * 1000
+                };
+                return data.access_token;
+            }
+        }
+    } catch (_) { }
+    return null;
+}
+
 export async function handleCoralSession(body: {
     clientId?: string;
     idToken?: string;
@@ -56,14 +91,15 @@ export async function handleCoralSession(body: {
     } catch (_) {
     }
 
-    if (!body.nxapiAccessToken) {
-        return { status: 502, data: { error: 'worker_unavailable_and_no_nxapi_token' } };
+    const effectiveNxapiToken = await getOrFetchNxapiToken(body.nxapiAccessToken);
+    if (!effectiveNxapiToken) {
+        return { status: 503, data: { error: 'nxapi_service_unavailable', error_description: 'Both Cloudflare Worker and nxapi are currently unreachable' } };
     }
 
     try {
         const result = await acquireCoralSessionFast({
             idToken: body.idToken,
-            nxapiAccessToken: body.nxapiAccessToken,
+            nxapiAccessToken: effectiveNxapiToken,
             naId: body.naId,
             language: body.language,
             country: body.country,
@@ -143,8 +179,9 @@ export async function handleGameToken(body: {
     } catch (_) {
     }
 
-    if (!body.nxapiAccessToken) {
-        return { status: 502, data: { error: 'worker_unavailable_and_no_nxapi_token' } };
+    const effectiveNxapiToken = await getOrFetchNxapiToken(body.nxapiAccessToken);
+    if (!effectiveNxapiToken) {
+        return { status: 503, data: { error: 'nxapi_service_unavailable', error_description: 'Both Cloudflare Worker and nxapi are currently unreachable' } };
     }
 
     try {
@@ -156,7 +193,7 @@ export async function handleGameToken(body: {
 
         const attestation = await generateSharedMethod2Attestation({
             coralAccessToken: String(body.coralAccessToken),
-            nxapiAccessToken: String(body.nxapiAccessToken),
+            nxapiAccessToken: String(effectiveNxapiToken),
             naId: String(body.naId),
             coralUserId: body.coralUserId || '',
             zncaVersion: requestedVersion
@@ -166,7 +203,7 @@ export async function handleGameToken(body: {
             const result = await acquireGameWebServiceTokenFast({
                 serviceId,
                 coralAccessToken: String(body.coralAccessToken),
-                nxapiAccessToken: String(body.nxapiAccessToken),
+                nxapiAccessToken: String(effectiveNxapiToken),
                 naId: String(body.naId),
                 coralUserId: body.coralUserId || '',
                 zncaVersion: requestedVersion,
@@ -265,8 +302,9 @@ export async function handleCoralCall(body: {
     } catch (_) {
     }
 
-    if (!body.nxapiAccessToken) {
-        return { status: 502, data: { error: 'worker_unavailable_and_no_nxapi_token' } };
+    const effectiveNxapiToken = await getOrFetchNxapiToken(body.nxapiAccessToken);
+    if (!effectiveNxapiToken) {
+        return { status: 503, data: { error: 'nxapi_service_unavailable', error_description: 'Both Cloudflare Worker and nxapi are currently unreachable' } };
     }
 
     try {
@@ -274,7 +312,7 @@ export async function handleCoralCall(body: {
             path: String(body.path),
             requestBody: body.requestBody ?? {},
             coralAccessToken: String(body.coralAccessToken),
-            nxapiAccessToken: String(body.nxapiAccessToken),
+            nxapiAccessToken: String(effectiveNxapiToken),
             zncaVersion: requestedVersion,
             locale: typeof body.locale === 'string' ? body.locale.slice(0, 35) : 'en-GB',
             platform: body.platform === true,
