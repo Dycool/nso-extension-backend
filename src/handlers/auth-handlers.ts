@@ -9,13 +9,14 @@ import {
     clearAllSessions
 } from '../storage/local-storage';
 import { clearGameSessionDnrRules } from '../dnr/dnr-manager';
+import { handleCoralSession, handleGameToken } from './nxapi-handlers';
 
 export async function sha256Hex(value: string): Promise<string> {
     const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
     return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
-export async function handleResumeSession(): Promise<{ status: number; data: any }> {
+export async function handleResumeSession(options: { warmServiceIds?: Array<string | number>; zncaVersion?: string } = {}): Promise<{ status: number; data: any }> {
     const remember = await getRememberSession();
     if (!remember) {
         return { status: 404, data: { error: 'No remembered session found' } };
@@ -46,11 +47,21 @@ export async function handleResumeSession(): Promise<{ status: number; data: any
             };
         }
 
+        // Keep remembered resume to one extension message. The frontend already
+        // understands brokerSession and will skip its follow-up session-start.
+        const broker = await handleSessionStart({
+            nintendoAccessToken: tokenData.access_token,
+            idToken: tokenData.id_token,
+            warmServiceIds: options.warmServiceIds,
+            zncaVersion: options.zncaVersion
+        });
+
         return {
             status: 200,
             data: {
                 idToken: tokenData.id_token,
-                accessToken: tokenData.access_token
+                accessToken: tokenData.access_token,
+                ...(broker.status === 200 && broker.data ? { brokerSession: broker.data } : {})
             }
         };
     } catch (err: any) {
@@ -74,7 +85,14 @@ export async function handleRememberForget(): Promise<{ status: number; data: an
     return { status: 200, data: { success: true } };
 }
 
-export async function handleSessionStart(body: { nintendoAccessToken?: string; clientId?: string }): Promise<{ status: number; data: any }> {
+export async function handleSessionStart(body: {
+    nintendoAccessToken?: string;
+    clientId?: string;
+    idToken?: string;
+    nxapiAccessToken?: string;
+    warmServiceIds?: Array<string | number>;
+    zncaVersion?: string;
+}): Promise<{ status: number; data: any }> {
     if (!body.nintendoAccessToken || typeof body.nintendoAccessToken !== 'string') {
         return { status: 400, data: { error: 'invalid_request' } };
     }
@@ -95,12 +113,56 @@ export async function handleSessionStart(body: { nintendoAccessToken?: string; c
         const accountHash = await sha256Hex(String(profile.id));
         await saveBrokerSession(accountHash);
 
+        // Match the Worker fast path: keep profile, Coral login, and an optional
+        // game-token warm-up within this one extension message. Errors leave the
+        // frontend's normal per-stage fallback intact.
+        let coral: any = null;
+        let gws: Record<string, any> | undefined;
+        if (body.idToken && profile.language && profile.country && profile.birthday) {
+            try {
+                const coralResponse = await handleCoralSession({
+                    clientId: body.clientId || accountHash,
+                    idToken: body.idToken,
+                    nxapiAccessToken: body.nxapiAccessToken,
+                    naId: String(profile.id),
+                    language: String(profile.language),
+                    country: String(profile.country),
+                    birthday: String(profile.birthday),
+                    zncaVersion: body.zncaVersion
+                });
+                if (coralResponse.status === 200 && coralResponse.data?.coral?.session) {
+                    coral = coralResponse.data.coral;
+                    const serviceIds = Array.from(new Set((Array.isArray(body.warmServiceIds) ? body.warmServiceIds : [])
+                        .map(String)
+                        .filter(serviceId => /^\d+$/.test(serviceId)))).slice(0, 3);
+                    const coralAccessToken = coral.session?.result?.webApiServerCredential?.accessToken;
+                    if (coralAccessToken && serviceIds.length) {
+                        const tokenResponse = await handleGameToken({
+                            clientId: body.clientId || accountHash,
+                            serviceId: serviceIds[0],
+                            serviceIds,
+                            coralAccessToken: String(coralAccessToken),
+                            nxapiAccessToken: body.nxapiAccessToken,
+                            naId: String(profile.id),
+                            coralUserId: String(coral.session?.result?.user?.id || coral.session?.user?.id || ''),
+                            zncaVersion: body.zncaVersion
+                        });
+                        if (tokenResponse.status === 200 && tokenResponse.data?.tokens) gws = tokenResponse.data.tokens;
+                    }
+                }
+            } catch (_) {
+                // Do not make the one-message optimization a login dependency.
+            }
+        }
+
         return {
             status: 200,
             data: {
                 success: true,
                 persistent: true,
                 profile,
+                ...(coral ? { coral } : {}),
+                ...(gws && Object.keys(gws).length ? { gws } : {}),
                 source: 'extension'
             }
         };

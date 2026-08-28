@@ -88,7 +88,7 @@ async function dispatchMessage(msg: any): Promise<{ status: number; data: any; t
             };
 
         case 'NSO_RESUME_SESSION':
-            return handleResumeSession();
+            return handleResumeSession(msg);
 
         case 'NSO_REMEMBER_SAVE':
             return handleRememberSave(msg);
