@@ -10,6 +10,8 @@ import { generateSharedMethod2Attestation } from '../nxapi/shared-f2';
 import { GameWebServiceTokenPipelineError } from '../nxapi/client';
 import { isStrictNintendoOrigin } from '../services/service-policy';
 
+const WORKER_API_BASE = 'https://nso-worker-backend.diogoenes0.workers.dev';
+
 export async function handleCoralSession(body: {
     clientId?: string;
     idToken?: string;
@@ -23,12 +25,40 @@ export async function handleCoralSession(body: {
     if (!body.clientId || !body.naId) {
         return { status: 400, data: { error: 'invalid_request' } };
     }
-    if (!body.idToken || !body.nxapiAccessToken || !body.language || !body.country || !body.birthday) {
+    if (!body.idToken || !body.language || !body.country || !body.birthday) {
         return { status: 200, data: { miss: true, needsNxapi: true, source: 'cache_miss' } };
     }
 
     const requestedVersion = typeof body.zncaVersion === 'string' && /^\d+\.\d+\.\d+$/.test(body.zncaVersion)
         ? body.zncaVersion : '3.4.1';
+
+    try {
+        const workerResp = await fetch(`${WORKER_API_BASE}/api/nso/cache/coral/get-or-create`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify({
+                clientId: body.clientId,
+                idToken: body.idToken,
+                nxapiAccessToken: body.nxapiAccessToken,
+                naId: body.naId,
+                language: body.language,
+                country: body.country,
+                birthday: body.birthday,
+                zncaVersion: requestedVersion
+            })
+        });
+        if (workerResp.ok) {
+            const data = await workerResp.json() as any;
+            if (data?.coral?.session) {
+                return { status: 200, data: { coral: data.coral, source: 'worker_native' } };
+            }
+        }
+    } catch (_) {
+    }
+
+    if (!body.nxapiAccessToken) {
+        return { status: 502, data: { error: 'worker_unavailable_and_no_nxapi_token' } };
+    }
 
     try {
         const result = await acquireCoralSessionFast({
@@ -49,7 +79,7 @@ export async function handleCoralSession(body: {
 
         return {
             status: 200,
-            data: { coral: coralPayload, source: 'extension' }
+            data: { coral: coralPayload, source: 'nxapi_fallback' }
         };
     } catch (error: any) {
         if (error instanceof GameWebServiceTokenPipelineError) {
@@ -75,12 +105,47 @@ export async function handleGameToken(body: {
     coralUserId?: string;
     zncaVersion?: string;
 }): Promise<{ status: number; data: any }> {
-    if (!body.clientId || !body.serviceId || !body.coralAccessToken || !body.nxapiAccessToken || !body.naId) {
+    if (!body.clientId || !body.serviceId || !body.coralAccessToken || !body.naId) {
         return { status: 400, data: { error: 'invalid_request' } };
     }
 
     const requestedVersion = typeof body.zncaVersion === 'string' && /^\d+\.\d+\.\d+$/.test(body.zncaVersion)
         ? body.zncaVersion : '3.4.1';
+
+    try {
+        const workerResp = await fetch(`${WORKER_API_BASE}/api/nso/service/token`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify({
+                clientId: body.clientId,
+                serviceId: String(body.serviceId),
+                serviceIds: body.serviceIds,
+                coralAccessToken: body.coralAccessToken,
+                nxapiAccessToken: body.nxapiAccessToken,
+                naId: body.naId,
+                coralUserId: body.coralUserId,
+                zncaVersion: requestedVersion
+            })
+        });
+        if (workerResp.ok) {
+            const data = await workerResp.json() as any;
+            if (data?.token) {
+                return {
+                    status: 200,
+                    data: {
+                        token: data.token,
+                        tokens: data.tokens,
+                        source: 'worker_native'
+                    }
+                };
+            }
+        }
+    } catch (_) {
+    }
+
+    if (!body.nxapiAccessToken) {
+        return { status: 502, data: { error: 'worker_unavailable_and_no_nxapi_token' } };
+    }
 
     try {
         const requestedId = String(body.serviceId);
@@ -89,7 +154,6 @@ export async function handleGameToken(body: {
             ...(Array.isArray(body.serviceIds) ? body.serviceIds.map(String) : [])
         ].filter(id => /^\d+$/.test(id)))).slice(0, 10);
 
-        // Generate ONE shared method-2 attestation with nxapi
         const attestation = await generateSharedMethod2Attestation({
             coralAccessToken: String(body.coralAccessToken),
             nxapiAccessToken: String(body.nxapiAccessToken),
@@ -98,7 +162,6 @@ export async function handleGameToken(body: {
             zncaVersion: requestedVersion
         });
 
-        // Reuse that exact attestation to get tokens for all services in parallel
         const settled = await Promise.allSettled(batchIds.map(async (serviceId) => {
             const result = await acquireGameWebServiceTokenFast({
                 serviceId,
@@ -143,7 +206,7 @@ export async function handleGameToken(body: {
             data: {
                 token: requestedToken,
                 tokens,
-                source: batchIds.length > 1 ? 'shared_f2' : 'extension'
+                source: batchIds.length > 1 ? 'shared_f2' : 'nxapi_fallback'
             }
         };
     } catch (error: any) {
@@ -172,13 +235,39 @@ export async function handleCoralCall(body: {
     productVersion?: boolean;
 }): Promise<{ status: number; data: any }> {
     const validToken = (value: unknown, max: number) => typeof value === 'string' && value.length > 0 && value.length <= max;
-    if (!body.clientId || !validToken(body.path, 256) || !validToken(body.coralAccessToken, 16_384) ||
-        !validToken(body.nxapiAccessToken, 16_384)) {
+    if (!body.clientId || !validToken(body.path, 256) || !validToken(body.coralAccessToken, 16_384)) {
         return { status: 400, data: { error: 'invalid_request' } };
     }
 
     const requestedVersion = typeof body.zncaVersion === 'string' && /^\d+\.\d+\.\d+$/.test(body.zncaVersion)
         ? body.zncaVersion : '3.4.1';
+
+    try {
+        const workerResp = await fetch(`${WORKER_API_BASE}/api/nso/coral/call`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify({
+                clientId: body.clientId,
+                path: body.path,
+                requestBody: body.requestBody,
+                coralAccessToken: body.coralAccessToken,
+                nxapiAccessToken: body.nxapiAccessToken,
+                zncaVersion: requestedVersion,
+                locale: body.locale,
+                platform: body.platform,
+                productVersion: body.productVersion
+            })
+        });
+        if (workerResp.ok) {
+            const data = await workerResp.json() as any;
+            return { status: 200, data };
+        }
+    } catch (_) {
+    }
+
+    if (!body.nxapiAccessToken) {
+        return { status: 502, data: { error: 'worker_unavailable_and_no_nxapi_token' } };
+    }
 
     try {
         const result = await performCoralApiCallFast({
@@ -326,7 +415,7 @@ export async function handleProxy(body: {
         try {
             const jsonData = await response.json();
             return { status: response.status, data: jsonData };
-        } catch (_) {}
+        } catch (_) { }
     }
 
     const textData = await response.text();

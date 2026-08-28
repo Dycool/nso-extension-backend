@@ -18,7 +18,9 @@
     "https://*.nintendo.com/*",
     "https://nxapi-znca-api.fancy.org.uk/*",
     "https://nxapi-auth.fancy.org.uk/*",
-    "https://*.fancy.org.uk/*"
+    "https://*.fancy.org.uk/*",
+    "https://nso-worker-backend.diogoenes0.workers.dev/*",
+    "https://*.workers.dev/*"
   ],
   "icons": {
     "16": "icons/icon16.png",
