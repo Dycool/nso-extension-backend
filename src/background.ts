@@ -180,15 +180,15 @@ if (typeof chrome !== 'undefined' && chrome.action?.onClicked) {
 // Listen for messages from externally_connectable web origins (dycool.github.io / localhost)
 chrome.runtime.onMessageExternal.addListener((request, _sender, sendResponse) => {
     dispatchMessage(request)
-        .then(result => sendResponse(result.data))
-        .catch(err => sendResponse({ error: 'internal_extension_error', message: err?.message }));
+        .then(result => sendResponse({ status: result.status, data: result.data, ...(result.data && typeof result.data === 'object' ? result.data : {}) }))
+        .catch(err => sendResponse({ status: 500, error: 'internal_extension_error', message: err?.message }));
     return true; // Keep channel open for async response
 });
 
 // Listen for internal extension messages
 chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
     dispatchMessage(request)
-        .then(result => sendResponse(result.data))
-        .catch(err => sendResponse({ error: 'internal_extension_error', message: err?.message }));
+        .then(result => sendResponse({ status: result.status, data: result.data, ...(result.data && typeof result.data === 'object' ? result.data : {}) }))
+        .catch(err => sendResponse({ status: 500, error: 'internal_extension_error', message: err?.message }));
     return true;
 });
