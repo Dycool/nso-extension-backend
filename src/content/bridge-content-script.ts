@@ -179,7 +179,56 @@ declare global {
             } catch (_) {}
         }
 
-        return nativeFetch(input, init);
+        let res: Response;
+        try {
+            res = await nativeFetch(input, init);
+        } catch (err) {
+            if (isSplatoon2) {
+                try {
+                    const targetUrl = new URL(rawUrl, location.href);
+                    if (targetUrl.pathname === '/api/coop_results') {
+                        return new Response(JSON.stringify({ summary: { card: null, stats: [] }, results: [], reward_gear: null }), {
+                            status: 200,
+                            headers: { 'Content-Type': 'application/json' }
+                        });
+                    }
+                    if (targetUrl.pathname === '/api/records/hero') {
+                        return new Response(JSON.stringify({ summary_reward: null, stage_infos: [] }), {
+                            status: 200,
+                            headers: { 'Content-Type': 'application/json' }
+                        });
+                    }
+                } catch (_) {}
+            }
+            throw err;
+        }
+
+        if (isSplatoon2 && (res.status === 500 || res.status === 404)) {
+            try {
+                const targetUrl = new URL(rawUrl, location.href);
+                if (targetUrl.pathname === '/api/coop_results') {
+                    return new Response(JSON.stringify({
+                        summary: { card: null, stats: [] },
+                        results: [],
+                        reward_gear: null
+                    }), {
+                        status: 200,
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                }
+                if (targetUrl.pathname === '/api/records/hero') {
+                    return new Response(JSON.stringify({
+                        summary_reward: null,
+                        stage_infos: []
+                    }), {
+                        status: 200,
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                }
+            } catch (_) {}
+        }
+
+        return res;
     };
 
     // ---------------------------------------------------------------------------
