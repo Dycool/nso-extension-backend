@@ -3,7 +3,7 @@ export const NXAPI_ZNCA_API_ORIGIN = 'https://nxapi-znca-api.fancy.org.uk';
 
 export const NXAPI_ZNCA_API_BASE = `${NXAPI_ZNCA_API_ORIGIN}/api/znca`;
 
-export const NXAPI_CLIENT_VERSION = 'w8zSLBsxR7rVoGJA';
+export const NXAPI_CLIENT_VERSION = 'd8fAZDPzwimzQ7c6';
 
 export const CORAL_GWS_TOKEN_URL = 'https://api-lp1.znc.srv.nintendo.net/v4/Game/GetWebServiceToken';
 
