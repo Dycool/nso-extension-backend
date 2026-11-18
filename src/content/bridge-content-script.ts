@@ -1,5 +1,7 @@
 
 
+import { installZeldaInlineVideoGuard } from './zelda-inline-video';
+
 declare global {
     interface Window {
         __NSO_ZNCA_BRIDGE_INSTALLED__?: boolean;
@@ -52,6 +54,7 @@ declare global {
 
 
     if (isZelda) {
+        installZeldaInlineVideoGuard();
         try {
             const nativeCanvasGetContext = HTMLCanvasElement.prototype.getContext;
             HTMLCanvasElement.prototype.getContext = function(this: HTMLCanvasElement, type: any, options?: any): any {

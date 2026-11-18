@@ -14,6 +14,8 @@
 
 🔍 **Automatic WebApp detection** — The WebApp (`https://dycool.github.io/nso-webapp` or `localhost`) automatically detects the extension on startup via `externally_connectable` with a deterministic Extension ID (`bjcigdmffhlolfpaocccgclocgdnenfc`).
 
+🎬 **OoT inline-video playback** — Suppresses the automatic fullscreen jump when pressing Play, while preserving direct Nintendo streaming and manual fullscreen.
+
 🚀 **Cross-browser support** — Manifest V3 extension compatible with Google Chrome, Microsoft Edge, Brave, and other Chromium-based browsers.
 
 > **Pre-packaged Extension Available!**

@@ -64,6 +64,7 @@ assert(bgDist.includes('NSO_GAME_SESSION_CREATE'), 'Background worker handles NS
 const csDist = read('dist/bridge-content-script.js');
 assert(csDist.includes('invokeMethod'), 'Bridge content script defines invokeMethod handler');
 assert(csDist.includes('NSO_ZNCA_BRIDGE_EVENT'), 'Bridge content script dispatches events to host');
+assert(csDist.includes('requestFullscreen'), 'Zelda video fullscreen guard is included');
 
 // 3. DeclarativeNetRequest Manager
 const dnrCode = read('src/dnr/dnr-manager.ts');
