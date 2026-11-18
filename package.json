@@ -1,6 +1,6 @@
 {
   "name": "nso-extension-backend",
-  "version": "1.0.2",
+  "version": "1.0.0",
   "description": "Manifest V3 Browser Extension Backend for Nintendo Switch Online WebApp",
   "scripts": {
     "build": "node build.js",

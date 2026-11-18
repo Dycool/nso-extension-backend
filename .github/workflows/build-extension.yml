@@ -50,6 +50,39 @@ jobs:
           path: dist/
           retention-days: 30
 
+      # One-time migration requested by the maintainer: keep only v1.0.0,
+      # containing the current main-branch code. This is gated by an explicit
+      # commit-message marker and never runs on ordinary pushes.
+      - name: Consolidate extension releases into v1.0.0 (one-time)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[consolidate-v1.0.0]')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          test "$(node -p "require('./package.json').version")" = "1.0.0"
+          test "$(node -p "require('./manifest.json').version")" = "1.0.0"
+          gh release view v1.0.0 > /dev/null
+          node build.js --zip
+          gh release upload v1.0.0 nso-extension-backend.zip --clobber
+          gh api --method PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/v1.0.0" \
+            -f sha="$GITHUB_SHA" -F force=true > /dev/null
+          gh release edit v1.0.0 --target "$GITHUB_SHA" --latest
+          for old_tag in v1.0.1 v1.0.2; do
+            if gh release view "$old_tag" > /dev/null 2>&1; then
+              gh release delete "$old_tag" --cleanup-tag --yes
+            elif gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$old_tag" > /dev/null 2>&1; then
+              gh api --method DELETE "repos/$GITHUB_REPOSITORY/git/refs/tags/$old_tag" > /dev/null
+            fi
+          done
+          gh release view v1.0.0 --json tagName,assets --jq '.tagName + " / " + (.["assets"] | map(.name) | join(", "))'
+          test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v1.0.0" --jq .object.sha)" = "$GITHUB_SHA"
+          for old_tag in v1.0.1 v1.0.2; do
+            if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$old_tag" > /dev/null 2>&1; then
+              echo "Unexpected remaining tag: $old_tag" >&2
+              exit 1
+            fi
+          done
+
       - name: Publish a release for a new main-branch version
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
