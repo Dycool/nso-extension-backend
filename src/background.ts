@@ -12,6 +12,8 @@ import {
     handleGameToken,
     handleCoralCall,
     handleCoralBatch,
+    handleExtensionDiagnostics,
+    handleBinaryMediaProxy,
     handleProxy
 } from './handlers/nxapi-handlers';
 import {
@@ -110,6 +112,12 @@ async function dispatchMessage(msg: any): Promise<{ status: number; data: any; t
 
         case 'NSO_CORAL_BATCH':
             return handleCoralBatch(msg);
+
+        case 'NSO_DIAGNOSTICS':
+            return handleExtensionDiagnostics();
+
+        case 'NSO_MEDIA_FETCH':
+            return handleBinaryMediaProxy(msg);
 
         case 'NSO_PROXY':
             return handleProxy(msg);

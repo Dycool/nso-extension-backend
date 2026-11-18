@@ -5,10 +5,8 @@ import {
     performCoralApiCallFast
 } from '../nxapi/coral';
 import { generateSharedMethod2Attestation } from '../nxapi/shared-f2';
-import { GameWebServiceTokenPipelineError } from '../nxapi/client';
+import { GameWebServiceTokenPipelineError, encodeBase64Bytes } from '../nxapi/client';
 import { isStrictNintendoOrigin } from '../services/service-policy';
-
-const WORKER_API_BASE = 'https://nso-worker-backend.diogoenes0.workers.dev';
 
 let cachedExtensionNxapiToken: { token: string; expiresAt: number } | null = null;
 
@@ -65,33 +63,9 @@ export async function handleCoralSession(body: {
     const requestedVersion = typeof body.zncaVersion === 'string' && /^\d+\.\d+\.\d+$/.test(body.zncaVersion)
         ? body.zncaVersion : '3.5.0';
 
-    try {
-        const workerResp = await fetch(`${WORKER_API_BASE}/api/nso/cache/coral/get-or-create`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-            body: JSON.stringify({
-                clientId: body.clientId,
-                idToken: body.idToken,
-                nxapiAccessToken: body.nxapiAccessToken,
-                naId: body.naId,
-                language: body.language,
-                country: body.country,
-                birthday: body.birthday,
-                zncaVersion: requestedVersion
-            })
-        });
-        if (workerResp.ok) {
-            const data = await workerResp.json() as any;
-            if (data?.coral?.session) {
-                return { status: 200, data: { coral: data.coral, source: 'worker_native' } };
-            }
-        }
-    } catch (_) {
-    }
-
     const effectiveNxapiToken = await getOrFetchNxapiToken(body.nxapiAccessToken);
     if (!effectiveNxapiToken) {
-        return { status: 503, data: { error: 'nxapi_service_unavailable', error_description: 'Both Cloudflare Worker and nxapi are currently unreachable' } };
+        return { status: 503, data: { error: 'nxapi_service_unavailable', error_description: 'nxapi is currently unreachable' } };
     }
 
     try {
@@ -113,7 +87,7 @@ export async function handleCoralSession(body: {
 
         return {
             status: 200,
-            data: { coral: coralPayload, source: 'nxapi_fallback' }
+            data: { coral: coralPayload, source: 'nxapi_direct' }
         };
     } catch (error: any) {
         if (error instanceof GameWebServiceTokenPipelineError) {
@@ -146,40 +120,9 @@ export async function handleGameToken(body: {
     const requestedVersion = typeof body.zncaVersion === 'string' && /^\d+\.\d+\.\d+$/.test(body.zncaVersion)
         ? body.zncaVersion : '3.5.0';
 
-    try {
-        const workerResp = await fetch(`${WORKER_API_BASE}/api/nso/service/token`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-            body: JSON.stringify({
-                clientId: body.clientId,
-                serviceId: String(body.serviceId),
-                serviceIds: body.serviceIds,
-                coralAccessToken: body.coralAccessToken,
-                nxapiAccessToken: body.nxapiAccessToken,
-                naId: body.naId,
-                coralUserId: body.coralUserId,
-                zncaVersion: requestedVersion
-            })
-        });
-        if (workerResp.ok) {
-            const data = await workerResp.json() as any;
-            if (data?.token) {
-                return {
-                    status: 200,
-                    data: {
-                        token: data.token,
-                        tokens: data.tokens,
-                        source: 'worker_native'
-                    }
-                };
-            }
-        }
-    } catch (_) {
-    }
-
     const effectiveNxapiToken = await getOrFetchNxapiToken(body.nxapiAccessToken);
     if (!effectiveNxapiToken) {
-        return { status: 503, data: { error: 'nxapi_service_unavailable', error_description: 'Both Cloudflare Worker and nxapi are currently unreachable' } };
+        return { status: 503, data: { error: 'nxapi_service_unavailable', error_description: 'nxapi is currently unreachable' } };
     }
 
     try {
@@ -277,32 +220,9 @@ export async function handleCoralCall(body: {
     const requestedVersion = typeof body.zncaVersion === 'string' && /^\d+\.\d+\.\d+$/.test(body.zncaVersion)
         ? body.zncaVersion : '3.5.0';
 
-    try {
-        const workerResp = await fetch(`${WORKER_API_BASE}/api/nso/coral/call`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-            body: JSON.stringify({
-                clientId: body.clientId,
-                path: body.path,
-                requestBody: body.requestBody,
-                coralAccessToken: body.coralAccessToken,
-                nxapiAccessToken: body.nxapiAccessToken,
-                zncaVersion: requestedVersion,
-                locale: body.locale,
-                platform: body.platform,
-                productVersion: body.productVersion
-            })
-        });
-        if (workerResp.ok) {
-            const data = await workerResp.json() as any;
-            return { status: 200, data };
-        }
-    } catch (_) {
-    }
-
     const effectiveNxapiToken = await getOrFetchNxapiToken(body.nxapiAccessToken);
     if (!effectiveNxapiToken) {
-        return { status: 503, data: { error: 'nxapi_service_unavailable', error_description: 'Both Cloudflare Worker and nxapi are currently unreachable' } };
+        return { status: 503, data: { error: 'nxapi_service_unavailable', error_description: 'nxapi is currently unreachable' } };
     }
 
     try {
@@ -473,3 +393,78 @@ export async function handleProxy(body: {
     }
 }
 
+
+/**
+ * Extension-only diagnostics. Unlike the hosted backend, this verifies nxapi
+ * from the browser's extension worker without contacting Cloudflare.
+ */
+export async function handleExtensionDiagnostics(): Promise<{ status: number; data: any }> {
+    const token = await getOrFetchNxapiToken();
+    const status = token ? 'ok' : 'unavailable';
+    return {
+        status: token ? 200 : 503,
+        data: {
+            status,
+            extension: { status: 'ok' },
+            nxapi: {
+                auth: { status },
+                znca: { status: token ? 'not_checked' : 'unavailable' },
+                config: { status: 'not_checked' }
+            }
+        }
+    };
+}
+
+/** Fetch Nintendo album media using extension host permissions, not a Worker.
+ * A bounded base64 response is required by Chrome's JSON messaging transport.
+ */
+export async function handleBinaryMediaProxy(body: { targetUrl?: string }): Promise<{ status: number; data: any }> {
+    if (!body.targetUrl || !isStrictNintendoOrigin(body.targetUrl)) {
+        return { status: 403, data: { error: 'media_destination_not_allowed' } };
+    }
+    const maxBytes = 20 * 1024 * 1024;
+    try {
+        const response = await fetch(body.targetUrl, { method: 'GET', credentials: 'omit' });
+        if (!response.ok) {
+            return { status: response.status, data: { error: 'media_fetch_failed' } };
+        }
+        const contentLength = Number(response.headers.get('Content-Length') || 0);
+        if (contentLength > maxBytes) {
+            try { await response.body?.cancel(); } catch (_) {}
+            return { status: 413, data: { error: 'media_too_large' } };
+        }
+        // Read incrementally to enforce the cap even without Content-Length.
+        const bytes: Uint8Array[] = [];
+        let total = 0;
+        const reader = response.body?.getReader();
+        if (reader) {
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                total += value.byteLength;
+                if (total > maxBytes) {
+                    await reader.cancel().catch(() => {});
+                    return { status: 413, data: { error: 'media_too_large' } };
+                }
+                bytes.push(value);
+            }
+        } else {
+            const array = new Uint8Array(await response.arrayBuffer());
+            if (array.byteLength > maxBytes) return { status: 413, data: { error: 'media_too_large' } };
+            bytes.push(array);
+            total = array.byteLength;
+        }
+        const combined = new Uint8Array(total);
+        let offset = 0;
+        for (const part of bytes) { combined.set(part, offset); offset += part.byteLength; }
+        return {
+            status: 200,
+            data: {
+                base64: encodeBase64Bytes(combined),
+                contentType: response.headers.get('Content-Type') || 'application/octet-stream'
+            }
+        };
+    } catch (error: any) {
+        return { status: 502, data: { error: 'media_fetch_failed', message: String(error?.message || error) } };
+    }
+}

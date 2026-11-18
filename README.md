@@ -6,7 +6,9 @@
 
 **Local zero-worker companion and direct connection engine for [CoralWeb](https://dycool.github.io/nso-webapp).**
 
-⚡ **Zero-server backend** — Connects directly from the browser background service worker to Nintendo APIs and nxapi with no remote proxy relay.
+⚡ **Zero-Cloudflare extension backend** — Connects directly from the browser background service worker to Nintendo APIs and nxapi with no remote proxy relay.
+
+🌐 **Direct-only extension transport** — All Coral operations use nxapi/Nintendo directly; health checks and album downloads stay inside the extension, without Cloudflare fallback.
 
 🛡️ **DeclarativeNetRequest header injection** — Dynamically strips `X-Frame-Options` and `Content-Security-Policy` from Nintendo domains and injects `X-GameWebToken` headers into Game Web Service iframe requests (NookLink, SplatNet 3, Smash World, etc.).
 

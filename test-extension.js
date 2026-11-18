@@ -98,4 +98,16 @@ assert(coralCode.includes('performCoralApiCallFast'), 'nxapi Coral call pipeline
 const sharedF2Code = read('src/nxapi/shared-f2.ts');
 assert(sharedF2Code.includes('generateSharedMethod2Attestation'), 'Shared method-2 f attestation is present');
 
+// 6. Strict extension-only networking guards
+const nxapiHandlers = read('src/handlers/nxapi-handlers.ts');
+const background = read('src/background.ts');
+assert(!nxapiHandlers.includes('WORKER_API_BASE') && !nxapiHandlers.includes('workers.dev'), 'Extension handlers contain no Cloudflare Worker transport');
+assert(!hostPerms.some(h => h.includes('workers.dev')), 'Extension does not request Cloudflare Worker host access');
+assert(background.includes("case 'NSO_DIAGNOSTICS'") && background.includes("case 'NSO_MEDIA_FETCH'"),
+    'Extension provides local nxapi diagnostics and local Nintendo media retrieval');
+assert(nxapiHandlers.includes('handleBinaryMediaProxy') && nxapiHandlers.includes('isStrictNintendoOrigin(body.targetUrl)'),
+    'Binary media transport is limited to Nintendo origins');
+assert(nxapiHandlers.includes('acquireCoralSessionFast') && nxapiHandlers.includes('performCoralApiCallFast'),
+    'Coral session generation and API calls use direct nxapi pipelines');
+
 console.log('All extension tests passed successfully!');
