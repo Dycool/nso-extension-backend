@@ -404,7 +404,8 @@ export async function handleExtensionDiagnostics(): Promise<{ status: number; da
     return {
         status: token ? 200 : 503,
         data: {
-            status,
+            // Keep HTTP status numeric in the outer extension response.
+            // The background message bridge spreads data over the envelope.
             extension: { status: 'ok' },
             nxapi: {
                 auth: { status },
