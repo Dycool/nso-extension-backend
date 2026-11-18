@@ -3,6 +3,39 @@ import { resolveAllowedOrigins, isNookLinkService, isZeldaNotesService, isSplatN
 import { updateGameSessionDnrRules, clearGameSessionDnrRules } from '../dnr/dnr-manager';
 import { CookieJar } from '../proxy/cookie-jar';
 
+// Remember the non-secret locale/identity for MV3 worker restarts during
+// token renewal. DNR rules already support a single active Game Web Service.
+const ACTIVE_GAME_SERVICE_CONTEXT_KEY = 'nso_active_game_service_context';
+
+interface ActiveGameServiceContext {
+    sessionId: string;
+    serviceId: string;
+    serviceUri?: string;
+    language: string;
+    country: string;
+}
+
+async function storeActiveGameService(context: ActiveGameServiceContext): Promise<void> {
+    try {
+        await chrome.storage.session.set({ [ACTIVE_GAME_SERVICE_CONTEXT_KEY]: context });
+    } catch (error) {
+        console.warn('[GameSession] Could not persist service locale:', error);
+    }
+}
+
+async function getActiveGameService(): Promise<ActiveGameServiceContext | null> {
+    try {
+        const stored = await chrome.storage.session.get(ACTIVE_GAME_SERVICE_CONTEXT_KEY);
+        return stored[ACTIVE_GAME_SERVICE_CONTEXT_KEY] || null;
+    } catch {
+        return null;
+    }
+}
+
+async function clearActiveGameService(): Promise<void> {
+    try { await chrome.storage.session.remove(ACTIVE_GAME_SERVICE_CONTEXT_KEY); } catch (_) {}
+}
+
 const ZELDA_DOMAIN = 'api.lp1.87abc152.srv.nintendo.net';
 const ZELDA_DOT_DOMAIN = '.api.lp1.87abc152.srv.nintendo.net';
 
@@ -130,7 +163,8 @@ async function injectZeldaCookies(
     const existingNames = new Set(bootstrapCookies.map(c => c.name));
     for (const sc of supplementalCookies) {
         const isAltDomain = sc.domain === ZELDA_DOT_DOMAIN;
-        if (!existingNames.has(sc.name) || isAltDomain) {
+        // Replace stale bootstrap locale cookies on both host and domain scopes.
+        if (!existingNames.has(sc.name) || isAltDomain || sc.name === 'lang' || sc.name === 'na_country') {
             await setCookie(sc.name, sc.value, sc.domain, sc.httpOnly);
         }
     }
@@ -166,11 +200,12 @@ export async function handleGameSessionCreate(body: {
 
 
     await updateGameSessionDnrRules(serviceId, body.serviceUri, body.token, language, country);
+    await storeActiveGameService({ sessionId, serviceId, serviceUri: body.serviceUri, language, country });
 
     const targetUrl = new URL(resolved.initialUri);
-    if (!targetUrl.searchParams.has('lang')) targetUrl.searchParams.set('lang', language);
-    if (!targetUrl.searchParams.has('na_country')) targetUrl.searchParams.set('na_country', country);
-    if (!targetUrl.searchParams.has('na_lang')) targetUrl.searchParams.set('na_lang', language);
+    targetUrl.searchParams.set('lang', language);
+    targetUrl.searchParams.set('na_country', country);
+    targetUrl.searchParams.set('na_lang', language);
 
     const isZelda = isZeldaNotesService(serviceId, body.serviceUri);
     const isSplatNet2 = isSplatNet2Service(serviceId, body.serviceUri);
@@ -249,15 +284,31 @@ export async function handleGameSessionCreate(body: {
 }
 
 export async function handleGameTokenRenew(body: {
+    sessionId?: string;
     serviceId?: string | number;
     serviceUri?: string;
     token?: string;
+    language?: string;
+    country?: string;
 }): Promise<{ status: number; data: any }> {
     if (!body.token || typeof body.token !== 'string') {
         return { status: 400, data: { error: 'Missing token parameter' } };
     }
-    const serviceId = String(body.serviceId || 'unknown');
-    await updateGameSessionDnrRules(serviceId, body.serviceUri, body.token);
+    const active = await getActiveGameService();
+    if (body.sessionId && active?.sessionId && body.sessionId !== active.sessionId) {
+        return { status: 409, data: { error: 'Game service session no longer active' } };
+    }
+    const serviceId = String(body.serviceId || active?.serviceId || 'unknown');
+    const serviceUri = body.serviceUri || active?.serviceUri;
+    const language = body.language || active?.language || 'en-US';
+    const country = body.country || active?.country || 'US';
+    await updateGameSessionDnrRules(serviceId, serviceUri, body.token, language, country);
+    if (serviceId !== 'unknown') {
+        await storeActiveGameService({
+            sessionId: body.sessionId || active?.sessionId || '',
+            serviceId, serviceUri, language, country
+        });
+    }
     return {
         status: 200,
         data: { success: true, expiresAt: Date.now() + 2 * 60 * 60 * 1000 }
@@ -266,5 +317,6 @@ export async function handleGameTokenRenew(body: {
 
 export async function handleGameSessionClose(): Promise<{ status: number; data: any }> {
     await clearGameSessionDnrRules();
+    await clearActiveGameService();
     return { status: 200, data: { success: true } };
 }

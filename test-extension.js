@@ -75,7 +75,21 @@ assert(dnrCode.includes('x-frame-options'), 'DNR strips x-frame-options header o
 assert(dnrCode.includes('content-security-policy'), 'DNR strips content-security-policy header on inbound game traffic');
 assert(dnrCode.includes('access-control-allow-origin'), 'DNR injects access-control-allow-origin header for media downloads');
 
-// 4. nxapi Core Integration
+// 4. Nintendo Game Web Service locale regression guards
+const gameHandlers = read('src/handlers/game-handlers.ts');
+assert(gameHandlers.includes("targetUrl.searchParams.set('lang', language)") &&
+       gameHandlers.includes("targetUrl.searchParams.set('na_lang', language)"),
+       'Service launch URL applies the selected language even when Nintendo supplies a default');
+assert(gameHandlers.includes("sc.name === 'lang' || sc.name === 'na_country'"),
+       'Zelda Notes locale cookies override previous bootstrap defaults');
+assert(gameHandlers.includes('chrome.storage.session.set') && gameHandlers.includes('chrome.storage.session.get'),
+       'Service locale survives MV3 background service-worker restarts');
+assert(gameHandlers.includes('body.language || active?.language') &&
+       gameHandlers.includes('body.country || active?.country') &&
+       gameHandlers.includes('updateGameSessionDnrRules(serviceId, serviceUri, body.token, language, country)'),
+       'Token renewal preserves the service ID, chosen language and account country');
+
+// 5. nxapi Core Integration
 const coralCode = read('src/nxapi/coral.ts');
 assert(coralCode.includes('acquireCoralSessionFast'), 'nxapi Coral session pipeline is present');
 assert(coralCode.includes('acquireGameWebServiceTokenFast'), 'nxapi GameWebServiceToken pipeline is present');
